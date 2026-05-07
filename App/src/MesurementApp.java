@@ -1,10 +1,9 @@
 /**
- * UC5: Unit-to-Unit Conversion and Equality System
- * Features: Immutability, Enum-based conversion factors, Method Overloading, 
- * and robust input validation.
+ * UC6: Measurement Addition System
+ * Supports cross-unit addition, maintaining immutability and type safety.
  */
 
-// Step 1: Enum with centralized conversion logic and factors
+// Step 1: Enum with conversion logic
 enum LengthUnit {
     INCH(1.0),
     FEET(12.0),
@@ -17,18 +16,16 @@ enum LengthUnit {
         this.conversionFactor = conversionFactor;
     }
 
-    // Helper to normalize any value to the base unit (Inches)
     public double toBaseUnit(double value) {
         return value * this.conversionFactor;
     }
 
-    // Helper to convert from the base unit back to the target unit
     public double fromBaseUnit(double value) {
         return value / this.conversionFactor;
     }
 }
 
-// Step 2: The Quantity Class (Value Object)
+// Step 2: The Quantity Class with Addition logic
 class Quantity {
     private final double value;
     private final LengthUnit unit;
@@ -39,33 +36,38 @@ class Quantity {
         this.unit = unit;
     }
 
-    // Private validation logic
     private static void validate(double value, LengthUnit unit) {
-        if (!Double.isFinite(value)) {
-            throw new IllegalArgumentException("Value must be a finite numeric number.");
-        }
-        if (unit == null) {
-            throw new IllegalArgumentException("Unit cannot be null.");
-        }
+        if (!Double.isFinite(value)) throw new IllegalArgumentException("Value must be finite.");
+        if (unit == null) throw new IllegalArgumentException("Unit cannot be null.");
     }
 
     /**
-     * Static Conversion API: Normalizes to base unit then converts to target.
+     * Instance method: Adds another quantity to this one.
+     * The result is returned in the unit of the first operand (this).
      */
-    public static double convert(double value, LengthUnit source, LengthUnit target) {
-        validate(value, source);
-        if (target == null) throw new IllegalArgumentException("Target unit cannot be null.");
+    public Quantity add(Quantity other) {
+        if (other == null) throw new IllegalArgumentException("Operand cannot be null.");
         
-        double baseInches = source.toBaseUnit(value);
-        return target.fromBaseUnit(baseInches);
+        // 1. Convert both to base unit (Inches)
+        double baseSum = this.unit.toBaseUnit(this.value) + other.unit.toBaseUnit(other.value);
+        
+        // 2. Convert sum back to THIS unit
+        double finalValue = this.unit.fromBaseUnit(baseSum);
+        
+        return new Quantity(finalValue, this.unit);
     }
 
     /**
-     * Instance Conversion: Returns a new Quantity object in the target unit.
+     * Static method: Adds two quantities and returns result in a specific target unit.
      */
-    public Quantity convertTo(LengthUnit targetUnit) {
-        double newValue = convert(this.value, this.unit, targetUnit);
-        return new Quantity(newValue, targetUnit);
+    public static Quantity add(Quantity q1, Quantity q2, LengthUnit targetUnit) {
+        if (q1 == null || q2 == null || targetUnit == null) 
+            throw new IllegalArgumentException("Operands and target unit must be non-null.");
+            
+        double baseSum = q1.unit.toBaseUnit(q1.value) + q2.unit.toBaseUnit(q2.value);
+        double finalValue = targetUnit.fromBaseUnit(baseSum);
+        
+        return new Quantity(finalValue, targetUnit);
     }
 
     @Override
@@ -73,7 +75,6 @@ class Quantity {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Quantity that = (Quantity) o;
-        // Use epsilon for floating-point equality (1e-6)
         return Math.abs(this.unit.toBaseUnit(this.value) - that.unit.toBaseUnit(that.value)) < 1e-6;
     }
 
@@ -83,53 +84,45 @@ class Quantity {
     }
 }
 
-// Step 3: Application layer with Method Overloading
+// Step 3: Application layer for testing and demonstration
 public class QuantityMeasurementApp {
 
-    /**
-     * Method Overloading 1: Direct value conversion
-     */
-    public static void demonstrateLengthConversion(double value, LengthUnit from, LengthUnit to) {
-        double result = Quantity.convert(value, from, to);
-        System.out.printf("[Value Conversion] %.2f %s = %.4f %s%n", value, from, result, to);
-    }
-
-    /**
-     * Method Overloading 2: Quantity object conversion
-     */
-    public static void demonstrateLengthConversion(Quantity lengthObj, LengthUnit targetUnit) {
-        Quantity result = lengthObj.convertTo(targetUnit);
-        System.out.println("[Object Conversion] " + lengthObj + " converted to " + result);
-    }
-
     public static void main(String[] args) {
-        System.out.println("--- UC5: Conversion and Equality Demonstration ---");
+        System.out.println("--- UC6: Addition of Measurements ---");
 
-        // 1. Basic Unit Conversions (Feet <-> Inches)
-        demonstrateLengthConversion(1.0, LengthUnit.FEET, LengthUnit.INCH);   // Output: 12.0
-        demonstrateLengthConversion(24.0, LengthUnit.INCH, LengthUnit.FEET); // Output: 2.0
+        // 1. Same Unit Addition: 1 ft + 2 ft = 3 ft
+        Quantity f1 = new Quantity(1.0, LengthUnit.FEET);
+        Quantity f2 = new Quantity(2.0, LengthUnit.FEET);
+        System.out.println("1 ft + 2 ft = " + f1.add(f2));
 
-        // 2. Cross-Unit Conversions (Yards <-> Inches)
-        demonstrateLengthConversion(1.0, LengthUnit.YARD, LengthUnit.INCH);  // Output: 36.0
-        demonstrateLengthConversion(36.0, LengthUnit.INCH, LengthUnit.YARD); // Output: 1.0
+        // 2. Cross-Unit Addition (Result in first unit): 1 ft + 12 in = 2 ft
+        Quantity twelveInches = new Quantity(12.0, LengthUnit.INCH);
+        System.out.println("1 ft + 12 in = " + f1.add(twelveInches));
 
-        // 3. CM to Inches (Precision Handling)
-        demonstrateLengthConversion(1.0, LengthUnit.CENTIMETER, LengthUnit.INCH); // Output: 0.3937
+        // 3. Cross-Unit Addition (Result in first unit): 12 in + 1 ft = 24 in
+        System.out.println("12 in + 1 ft = " + twelveInches.add(f1));
 
-        // 4. Object-Based Conversion (Method Overloading)
-        Quantity myYards = new Quantity(3.0, LengthUnit.YARD);
-        demonstrateLengthConversion(myYards, LengthUnit.FEET); // Output: 9.0 FEET
-
-        // 5. Equality Check (Preserving UC4 logic)
+        // 4. Yards and Feet: 1 yard + 3 feet = 2 yards
         Quantity oneYard = new Quantity(1.0, LengthUnit.YARD);
-        Quantity thirtySixInches = new Quantity(36.0, LengthUnit.INCH);
-        System.out.println("Equality Test (1 Yard == 36 Inches): " + oneYard.equals(thirtySixInches));
+        Quantity threeFeet = new Quantity(3.0, LengthUnit.FEET);
+        System.out.println("1 yard + 3 feet = " + oneYard.add(threeFeet));
 
-        // 6. Validation Test
-        try {
-            Quantity.convert(Double.NaN, LengthUnit.FEET, LengthUnit.INCH);
-        } catch (IllegalArgumentException e) {
-            System.out.println("Error Caught: " + e.getMessage());
-        }
+        // 5. Centimeters and Inches: 2.54 cm + 1 in = 5.08 cm
+        Quantity cmVal = new Quantity(2.54, LengthUnit.CENTIMETER);
+        Quantity inchVal = new Quantity(1.0, LengthUnit.INCH);
+        System.out.println("2.54 cm + 1 in = " + cmVal.add(inchVal));
+
+        // 6. Commutativity Test
+        Quantity sum1 = f1.add(twelveInches); // Result in Feet
+        Quantity sum2 = twelveInches.add(f1); // Result in Inches
+        System.out.println("Sum 1 equals Sum 2 (Logic check): " + sum1.equals(sum2));
+
+        // 7. Identity Element (Adding Zero)
+        Quantity zeroInches = new Quantity(0.0, LengthUnit.INCH);
+        System.out.println("5 ft + 0 in = " + new Quantity(5.0, LengthUnit.FEET).add(zeroInches));
+        
+        // 8. Negative Value Handling
+        Quantity negTwoFeet = new Quantity(-2.0, LengthUnit.FEET);
+        System.out.println("5 ft + (-2 ft) = " + new Quantity(5.0, LengthUnit.FEET).add(negTwoFeet));
     }
 }
