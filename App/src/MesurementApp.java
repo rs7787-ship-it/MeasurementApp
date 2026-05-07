@@ -1,64 +1,63 @@
 /**
- * UC10: THE UNIFIED GENERIC MEASUREMENT SYSTEM
- * -------------------------------------------------------------------------
- * This single codebase supports Length, Weight, and any future categories
- * by using Java Generics and a common Interface contract.
+ * UC11: Volume Measurement Implementation
+ * Supports: Litres, Millilitres, and Gallons
  */
 
-// 1. The Interface Contract: Standardizes behavior for ALL measurement units
+// 1. The Interface Contract (required for the Generic Quantity class)
 interface IMeasurable {
     double convertToBaseUnit(double value);
     double convertFromBaseUnit(double baseValue);
     String getUnitName();
 }
 
-// 2. Length Category implementation
-enum LengthUnit implements IMeasurable {
-    INCHES(1.0), FEET(12.0), YARDS(36.0), CM(0.393701);
+// 2. UC11 Volume Unit Implementation
+enum VolumeUnit implements IMeasurable {
+    LITRE(1.0),
+    MILLILITRE(0.001),
+    GALLON(3.78541); // 1 Gallon ≈ 3.78541 Litres
 
     private final double factor;
-    LengthUnit(double factor) { this.factor = factor; }
 
-    @Override public double convertToBaseUnit(double v) { return v * factor; }
-    @Override public double convertFromBaseUnit(double b) { return b / factor; }
-    @Override public String getUnitName() { return name(); }
+    VolumeUnit(double factor) {
+        this.factor = factor;
+    }
+
+    @Override
+    public double convertToBaseUnit(double value) {
+        return value * this.factor;
+    }
+
+    @Override
+    public double convertFromBaseUnit(double baseValue) {
+        return baseValue / this.factor;
+    }
+
+    @Override
+    public String getUnitName() {
+        return this.name();
+    }
 }
 
-// 3. Weight Category implementation
-enum WeightUnit implements IMeasurable {
-    KG(1.0), GRAMS(0.001), LBS(0.453592);
-
-    private final double factor;
-    WeightUnit(double factor) { this.factor = factor; }
-
-    @Override public double convertToBaseUnit(double v) { return v * factor; }
-    @Override public double convertFromBaseUnit(double b) { return b / factor; }
-    @Override public String getUnitName() { return name(); }
-}
-
-// 4. The Generic Quantity Class: One class to handle every category safely
+// 3. Generic Quantity Engine (reused for Volume)
 class Quantity<U extends IMeasurable> {
     private final double value;
     private final U unit;
 
     public Quantity(double value, U unit) {
-        if (unit == null || !Double.isFinite(value)) 
-            throw new IllegalArgumentException("Invalid value or unit.");
+        if (unit == null || !Double.isFinite(value)) throw new IllegalArgumentException("Invalid input.");
         this.value = value;
         this.unit = unit;
     }
 
-    // Convert to a target unit within the same category
     public Quantity<U> convertTo(U targetUnit) {
-        double base = this.unit.convertToBaseUnit(this.value);
-        return new Quantity<>(targetUnit.convertFromBaseUnit(base), targetUnit);
+        double baseValue = this.unit.convertToBaseUnit(this.value);
+        return new Quantity<>(targetUnit.convertFromBaseUnit(baseValue), targetUnit);
     }
 
-    // Add two quantities of the same category
     public Quantity<U> add(Quantity<U> other, U targetUnit) {
-        double totalBase = this.unit.convertToBaseUnit(this.value) + 
-                           other.unit.convertToBaseUnit(other.value);
-        return new Quantity<>(targetUnit.convertFromBaseUnit(totalBase), targetUnit);
+        double sumBase = this.unit.convertToBaseUnit(this.value) + 
+                         other.unit.convertToBaseUnit(other.value);
+        return new Quantity<>(targetUnit.convertFromBaseUnit(sumBase), targetUnit);
     }
 
     @Override
@@ -66,40 +65,43 @@ class Quantity<U extends IMeasurable> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Quantity<?> that = (Quantity<?>) o;
-
-        // Category Safety: Prevent comparing Length to Weight at runtime
+        
+        // Ensure we are comparing within the same unit category (Volume vs Volume)
         if (this.unit.getClass() != that.unit.getClass()) return false;
 
-        double v1 = this.unit.convertToBaseUnit(this.value);
-        double v2 = ((IMeasurable) that.unit).convertToBaseUnit(that.value);
-        return Math.abs(v1 - v2) < 1e-6;
+        return Math.abs(this.unit.convertToBaseUnit(this.value) - 
+               ((IMeasurable)that.unit).convertToBaseUnit(that.value)) < 1e-6;
     }
 
     @Override
     public String toString() {
-        return String.format("%.2f %s", value, unit.getUnitName());
+        return String.format("%.3f %s", value, unit.getUnitName());
     }
 }
 
-// 5. Orchestration Layer
-public class QuantityMeasurementApp {
+// 4. Main Demo for UC11
+public class VolumeMeasurementApp {
     public static void main(String[] args) {
-        System.out.println("--- UC10 GENERIC SYSTEM DEMO ---");
+        System.out.println("--- UC11 VOLUME MEASUREMENT DEMO ---");
 
-        // Length Operations
-        Quantity<LengthUnit> oneFt = new Quantity<>(1.0, LengthUnit.FEET);
-        Quantity<LengthUnit> twelveIn = new Quantity<>(12.0, LengthUnit.INCHES);
-        System.out.println("Length Equality (1ft == 12in): " + oneFt.equals(twelveIn));
-        System.out.println("Length Addition (1ft + 12in): " + oneFt.add(twelveIn, LengthUnit.FEET));
+        // Equality: 1 Gallon vs 3.785 Litres
+        Quantity<VolumeUnit> oneGallon = new Quantity<>(1.0, VolumeUnit.GALLON);
+        Quantity<VolumeUnit> litres = new Quantity<>(3.78541, VolumeUnit.LITRE);
+        System.out.println("1 Gallon == 3.78541 Litres: " + oneGallon.equals(litres));
 
-        // Weight Operations
-        Quantity<WeightUnit> oneKg = new Quantity<>(1.0, WeightUnit.KG);
-        Quantity<WeightUnit> grams = new Quantity<>(1000.0, WeightUnit.GRAMS);
-        System.out.println("Weight Equality (1kg == 1000g): " + oneKg.equals(grams));
+        // Equality: 1 Litre vs 1000 mL
+        Quantity<VolumeUnit> oneLitre = new Quantity<>(1.0, VolumeUnit.LITRE);
+        Quantity<VolumeUnit> ml = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
+        System.out.println("1 Litre == 1000 mL: " + oneLitre.equals(ml));
 
-        // Cross-Category Safety
-        System.out.println("Cross-Category (1ft == 1kg): " + oneFt.equals(oneKg));
+        // Addition: 1L + 1000mL (Target: Litre)
+        System.out.println("Sum (1L + 1000mL) in Litres: " + oneLitre.add(ml, VolumeUnit.LITRE));
 
-        // Scalability Check: Adding Volume is now just an Enum away!
+        // Addition: 1 Gallon + 3.785L (Target: Gallon)
+        System.out.println("Sum (1 Gallon + 3.78541L) in Gallons: " + oneGallon.add(litres, VolumeUnit.GALLON));
+        
+        // Conversion: 1 Gallon to mL
+        System.out.println("1 Gallon converted to mL: " + oneGallon.convertTo(VolumeUnit.MILLILITRE));
     }
 }
+```</U>
