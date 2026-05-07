@@ -1,111 +1,120 @@
 /**
- * UC8: Consolidated Architecture
- * Responsibility: 
- * - LengthUnit: Logic for unit conversion.
- * - Quantity: Logic for measurement comparison and arithmetic.
+ * UNIFIED QUANTITY MEASUREMENT SYSTEM
+ * Supported Categories: Length (Inches, Feet, Yards, CM) and Weight (KG, Grams, Pounds)
+ * Features: Standalone Enums, SRP, Type Safety, and Immutability.
  */
 
-// Step 1: Standalone Enum with Conversion Responsibility
+// --- CATEGORY 1: LENGTH UNITS ---
 enum LengthUnit {
-    FEET(1.0),
-    INCHES(1.0 / 12.0),
-    YARDS(3.0),
-    CENTIMETERS(1.0 / 30.48);
+    INCHES(1.0), 
+    FEET(12.0), 
+    YARDS(36.0), 
+    CENTIMETERS(0.393701);
 
-    private final double conversionFactor;
+    private final double factor;
+    LengthUnit(double factor) { this.factor = factor; }
 
-    LengthUnit(double conversionFactor) {
-        this.conversionFactor = conversionFactor;
-    }
-
-    /**
-     * Responsibility: Convert this unit's value to the base unit (FEET).
-     */
-    public double convertToBaseUnit(double value) {
-        return value * this.conversionFactor;
-    }
-
-    /**
-     * Responsibility: Convert a base unit value (FEET) to this unit.
-     */
-    public double convertFromBaseUnit(double baseValue) {
-        return baseValue / this.conversionFactor;
-    }
+    public double toBase(double val) { return val * factor; }
+    public double fromBase(double val) { return val / factor; }
 }
 
-// Step 2: Simplified Quantity Class (Delegates conversion to the Unit)
-class Quantity {
+// --- CATEGORY 2: WEIGHT UNITS ---
+enum WeightUnit {
+    KILOGRAMS(1.0), 
+    GRAMS(0.001), 
+    POUNDS(0.453592);
+
+    private final double factor;
+    WeightUnit(double factor) { this.factor = factor; }
+
+    public double toBase(double val) { return val * factor; }
+    public double fromBase(double val) { return val / factor; }
+}
+
+// --- LENGTH QUANTITY ---
+class Length {
     private final double value;
     private final LengthUnit unit;
 
-    public Quantity(double value, LengthUnit unit) {
-        if (unit == null) throw new IllegalArgumentException("Unit cannot be null.");
-        if (!Double.isFinite(value)) throw new IllegalArgumentException("Value must be finite.");
+    public Length(double value, LengthUnit unit) {
+        if (unit == null || !Double.isFinite(value)) throw new IllegalArgumentException("Invalid Input");
         this.value = value;
         this.unit = unit;
     }
 
-    /**
-     * Equality Check: Normalizes both quantities to base unit via delegation.
-     */
+    public Length convertTo(LengthUnit target) {
+        return new Length(target.fromBase(this.unit.toBase(this.value)), target);
+    }
+
+    public Length add(Length other, LengthUnit target) {
+        double sumBase = this.unit.toBase(this.value) + other.unit.toBase(other.value);
+        return new Length(target.fromBase(sumBase), target);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Quantity that = (Quantity) o;
-        return Math.abs(this.unit.convertToBaseUnit(this.value) - 
-                        that.unit.convertToBaseUnit(that.value)) < 1e-6;
-    }
-
-    /**
-     * Conversion: Uses unit methods to transform value.
-     */
-    public Quantity convertTo(LengthUnit targetUnit) {
-        double baseValue = this.unit.convertToBaseUnit(this.value);
-        return new Quantity(targetUnit.convertFromBaseUnit(baseValue), targetUnit);
-    }
-
-    /**
-     * Addition: Sums base values and converts result to target unit.
-     */
-    public Quantity add(Quantity other, LengthUnit targetUnit) {
-        if (other == null || targetUnit == null) 
-            throw new IllegalArgumentException("Operands and target unit must be non-null.");
-            
-        double baseSum = this.unit.convertToBaseUnit(this.value) + 
-                         other.unit.convertToBaseUnit(other.value);
-        return new Quantity(targetUnit.convertFromBaseUnit(baseSum), targetUnit);
+        Length other = (Length) o;
+        return Math.abs(this.unit.toBase(this.value) - other.unit.toBase(other.value)) < 1e-6;
     }
 
     @Override
-    public String toString() {
-        return String.format("%.3f %s", value, unit);
-    }
+    public String toString() { return String.format("%.2f %s", value, unit); }
 }
 
-// Step 3: Application layer for standalone testing
+// --- WEIGHT QUANTITY ---
+class Weight {
+    private final double value;
+    private final WeightUnit unit;
+
+    public Weight(double value, WeightUnit unit) {
+        if (unit == null || !Double.isFinite(value)) throw new IllegalArgumentException("Invalid Input");
+        this.value = value;
+        this.unit = unit;
+    }
+
+    public Weight convertTo(WeightUnit target) {
+        return new Weight(target.fromBase(this.unit.toBase(this.value)), target);
+    }
+
+    public Weight add(Weight other, WeightUnit target) {
+        double sumBase = this.unit.toBase(this.value) + other.unit.toBase(other.value);
+        return new Weight(target.fromBase(sumBase), target);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false; // Category Safety
+        Weight other = (Weight) o;
+        return Math.abs(this.unit.toBase(this.value) - other.unit.toBase(other.value)) < 1e-6;
+    }
+
+    @Override
+    public String toString() { return String.format("%.2f %s", value, unit); }
+}
+
+// --- MAIN APPLICATION ---
 public class QuantityMeasurementApp {
     public static void main(String[] args) {
-        System.out.println("--- UC8 Standalone Architecture Results ---");
+        System.out.println("=== 1 CODE SYSTEM: LENGTH & WEIGHT ===");
 
-        // 1. Conversion via Delegation
-        Quantity oneFoot = new Quantity(1.0, LengthUnit.FEET);
-        System.out.println("1 Foot to Inches: " + oneFoot.convertTo(LengthUnit.INCHES));
+        // Length Tests
+        Length mile = new Length(1, LengthUnit.YARDS);
+        Length feet = new Length(3, LengthUnit.FEET);
+        System.out.println("1 Yard + 3 Feet in Yards: " + mile.add(feet, LengthUnit.YARDS));
 
-        // 2. Equality check
-        Quantity twelveInches = new Quantity(12.0, LengthUnit.INCHES);
-        System.out.println("1 Foot equals 12 Inches: " + oneFoot.equals(twelveInches));
+        // Weight Tests
+        Weight kg = new Weight(1, WeightUnit.KILOGRAMS);
+        Weight grams = new Weight(1000, WeightUnit.GRAMS);
+        System.out.println("1 KG equals 1000 Grams: " + kg.equals(grams));
 
-        // 3. Addition with Target Unit
-        Quantity oneYard = new Quantity(1.0, LengthUnit.YARDS);
-        Quantity threeFeet = new Quantity(3.0, LengthUnit.FEET);
-        System.out.println("1 Yard + 3 Feet (in Yards): " + oneYard.add(threeFeet, LengthUnit.YARDS));
+        // Conversion Test
+        Weight pounds = new Weight(1, WeightUnit.POUNDS);
+        System.out.println("1 Pound in Grams: " + pounds.convertTo(WeightUnit.GRAMS));
 
-        // 4. Centimeter Conversion
-        Quantity oneCm = new Quantity(2.54, LengthUnit.CENTIMETERS);
-        System.out.println("2.54 CM to Inches: " + oneCm.convertTo(LengthUnit.INCHES));
-
-        // 5. Unit-level responsibility check
-        System.out.println("Raw Unit Logic (12 inches to feet): " + LengthUnit.INCHES.convertToBaseUnit(12.0));
+        // Category Incompatibility Check (Weight vs Length)
+        System.out.println("Is 1 KG equal to 1 Yard? " + kg.equals(mile)); 
     }
 }
